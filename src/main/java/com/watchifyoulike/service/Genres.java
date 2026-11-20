@@ -26,7 +26,16 @@ public final class Genres {
             Map.entry(10770, "TV Movie"),
             Map.entry(53, "Thriller"),
             Map.entry(10752, "War"),
-            Map.entry(37, "Western"));
+            Map.entry(37, "Western"),
+            // TV-only genres
+            Map.entry(10759, "Action & Adventure"),
+            Map.entry(10762, "Kids"),
+            Map.entry(10763, "News"),
+            Map.entry(10764, "Reality"),
+            Map.entry(10765, "Sci-Fi & Fantasy"),
+            Map.entry(10766, "Soap"),
+            Map.entry(10767, "Talk"),
+            Map.entry(10768, "War & Politics"));
 
     private Genres() {
     }

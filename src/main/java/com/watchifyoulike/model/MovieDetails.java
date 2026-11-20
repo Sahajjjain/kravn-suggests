@@ -20,5 +20,7 @@ public record MovieDetails(
         String trailerKey,
         List<Provider> providers,
         String providerLink,
-        String region) {
+        String region,
+        String type,
+        int seasons) {
 }

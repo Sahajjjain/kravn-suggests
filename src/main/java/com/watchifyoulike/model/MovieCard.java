@@ -11,5 +11,6 @@ public record MovieCard(
         double rating,
         String overview,
         List<String> genres,
-        String backdropUrl) {
+        String backdropUrl,
+        String type) {
 }

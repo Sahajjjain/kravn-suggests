@@ -27,25 +27,29 @@ public class MatchService {
 
     private final TmdbClient tmdb;
     private final AiScorer ai;
-    private final Map<Integer, MatchesResponse> cache = new ConcurrentHashMap<>();
+    private final Map<String, MatchesResponse> cache = new ConcurrentHashMap<>();
 
     public MatchService(TmdbClient tmdb, AiScorer ai) {
         this.tmdb = tmdb;
         this.ai = ai;
     }
 
-    public MatchesResponse matchesFor(int id) {
-        MatchesResponse cached = cache.get(id);
+    public MatchesResponse matchesFor(String type, int id) {
+        String key = type + ":" + id;
+        MatchesResponse cached = cache.get(key);
         if (cached != null) {
             return cached;
         }
 
-        JsonNode base = tmdb.movieRaw(id);
-        String title = base.path("title").asText("this movie");
-        String year = TmdbClient.year(base.path("release_date").asText(""));
+        JsonNode base = tmdb.raw(type, id);
+        String title = TmdbClient.titleOf(base);
+        if (title.isEmpty()) {
+            title = "this title";
+        }
+        String year = TmdbClient.year(TmdbClient.dateOf(base));
         String overview = base.path("overview").asText("");
         List<String> baseGenres = tmdb.genreNames(base.path("genres"));
-        List<MovieCard> candidates = tmdb.candidates(id, MAX_CANDIDATES);
+        List<MovieCard> candidates = tmdb.candidates(type, id, MAX_CANDIDATES);
 
         Map<Integer, AiScorer.Score> scores = ai.score(title, year, overview, baseGenres, candidates);
 
@@ -71,7 +75,7 @@ public class MatchService {
             if (cache.size() > 300) {
                 cache.clear();
             }
-            cache.put(id, response);
+            cache.put(key, response);
         }
         return response;
     }

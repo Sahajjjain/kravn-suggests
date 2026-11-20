@@ -12,7 +12,6 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,15 +35,10 @@ public class AiScorer {
     private final ObjectMapper mapper;
     private final String apiKey;
     private final String model;
-    private final int dailyLimit;
-    private LocalDate day = LocalDate.now();
-    private int usedToday = 0;
 
     public AiScorer(@Value("${anthropic.api-key:}") String apiKey,
                     @Value("${anthropic.model}") String model,
-                    @Value("${anthropic.daily-limit:300}") int dailyLimit,
                     ObjectMapper mapper) {
-        this.dailyLimit = dailyLimit;
         this.apiKey = apiKey.trim();
         this.model = model;
         this.mapper = mapper;
@@ -59,23 +53,9 @@ public class AiScorer {
         return !apiKey.isEmpty();
     }
 
-    /** Protects your Anthropic bill: after dailyLimit AI calls in a day, picks are estimated instead. */
-    private synchronized boolean allowCall() {
-        LocalDate today = LocalDate.now();
-        if (!today.equals(day)) {
-            day = today;
-            usedToday = 0;
-        }
-        if (usedToday >= dailyLimit) {
-            return false;
-        }
-        usedToday++;
-        return true;
-    }
-
     public Map<Integer, Score> score(String title, String year, String overview,
                                      List<String> genres, List<MovieCard> candidates) {
-        if (!isConfigured() || candidates.isEmpty() || !allowCall()) {
+        if (!isConfigured() || candidates.isEmpty()) {
             return Map.of();
         }
         try {
@@ -94,19 +74,19 @@ public class AiScorer {
             }
 
             String prompt = """
-                    A viewer loves the movie "%s" (%s).
+                    A viewer loves the title "%s" (%s). Candidates may be movies or TV series; judge them the same way.
                     Genres: %s
                     Plot: %s
 
-                    Here are candidate movies to recommend, as JSON:
+                    Here are candidate titles to recommend, as JSON:
                     %s
 
                     For EVERY candidate give a "similarity" from 0 to 100: how close it is to the
-                    loved movie in themes, tone, pacing, storytelling style and emotional feel.
-                    Be honest and spread the scores out. Reserve 85 and above for movies that are
+                    loved title in themes, tone, pacing, storytelling style and emotional feel.
+                    Be honest and spread the scores out. Reserve 85 and above for titles that are
                     truly near-twins, and give loosely related picks scores in the 40s and 50s.
                     Write a "reason": one short sentence (max 18 words) on why a fan of the loved
-                    movie would enjoy it. No spoilers.
+                    title would enjoy it. No spoilers.
 
                     Reply with ONLY a JSON array, no markdown and no other text:
                     [{"id": 123, "similarity": 87, "reason": "..."}]

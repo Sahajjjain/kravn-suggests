@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/** {type} is "movie" or "tv" everywhere below. */
 @RestController
 @RequestMapping("/api")
 public class MovieController {
@@ -27,32 +28,31 @@ public class MovieController {
         this.matchService = matchService;
     }
 
-    @GetMapping("/trending")
-    public List<MovieCard> trending() {
-        return tmdb.trending();
+    @GetMapping("/lists/{type}/{name}")
+    public List<MovieCard> list(@PathVariable("type") String type, @PathVariable("name") String name) {
+        return tmdb.list(type, name);
     }
 
-    @GetMapping("/lists/{name}")
-    public List<MovieCard> list(@PathVariable("name") String name) {
-        return tmdb.list(name);
-    }
-
+    /** type is optional: movie, tv, or all (default) to search both. */
     @GetMapping("/search")
-    public List<MovieCard> search(@RequestParam("q") String q) {
+    public List<MovieCard> search(@RequestParam("q") String q,
+                                  @RequestParam(value = "type", defaultValue = "all") String type) {
         String query = q == null ? "" : q.trim();
         if (query.isEmpty() || query.length() > 100) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a movie name (up to 100 characters).");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a movie or series name (up to 100 characters).");
         }
-        return tmdb.search(query);
+        return tmdb.search(type, query);
     }
 
-    @GetMapping("/movie/{id}")
-    public MovieDetails movie(@PathVariable("id") int id) {
-        return tmdb.details(id);
+    @GetMapping("/{type}/{id}")
+    public MovieDetails details(@PathVariable("type") String type, @PathVariable("id") int id) {
+        TmdbClient.kind(type);
+        return tmdb.details(type, id);
     }
 
-    @GetMapping("/movie/{id}/matches")
-    public MatchesResponse matches(@PathVariable("id") int id) {
-        return matchService.matchesFor(id);
+    @GetMapping("/{type}/{id}/matches")
+    public MatchesResponse matches(@PathVariable("type") String type, @PathVariable("id") int id) {
+        TmdbClient.kind(type);
+        return matchService.matchesFor(type, id);
     }
 }
