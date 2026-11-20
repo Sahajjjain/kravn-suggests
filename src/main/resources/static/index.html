@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KravN Suggests</title>
+  <meta name="theme-color" content="#050507">
+  <meta name="description" content="Search a movie you love and get movies to watch next, with a match meter for each pick.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">KravN <span>Suggests</span></a>
+    <div class="search">
+      <input id="q" type="search" placeholder="Search a movie you love (press / to focus)" autocomplete="off"
+             aria-label="Search for a movie" role="combobox" aria-expanded="false" aria-controls="suggest">
+      <ul id="suggest" class="suggest" role="listbox" hidden></ul>
+    </div>
+    <a class="nav-link" href="#/list">My list <span id="list-count" hidden>0</span></a>
+  </header>
+
+  <main id="app" class="wrap"></main>
+
+  <footer class="wrap foot">
+    <p>KravN Suggests. This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability data is provided by JustWatch.</p>
+  </footer>
+
+  <dialog id="trailer" aria-label="Trailer">
+    <div class="trailer-box">
+      <button id="trailer-close" class="close" aria-label="Close trailer">Close</button>
+      <iframe id="trailer-frame" title="Movie trailer" src="about:blank"
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
