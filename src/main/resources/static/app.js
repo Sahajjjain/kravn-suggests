@@ -174,21 +174,29 @@ function rowShell(name, title) {
     </section>`;
 }
 
+
 async function loadRow(token, name, onData) {
   const row = $("#row-" + name);
+
   try {
     const movies = await api(`/lists/${homeType}/${name}`);
+
     if (token !== navToken) return;
+
     row.innerHTML = movies.map((m) => card(m)).join("");
+
     if (onData) onData(movies);
+
   } catch (e) {
     if (token !== navToken) return;
+
     const block = row.closest(".row-block");
-    // Show the error once, not once per row.
+
     if ($(".notice.error")) block.remove();
     else block.outerHTML = errorBox(e.message);
   }
 }
+
 
 // Puts a random top-trending movie's backdrop behind the hero.
 function feature(movies) {
