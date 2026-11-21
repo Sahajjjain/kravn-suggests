@@ -37,22 +37,46 @@ public class MovieController {
         return tmdb.list(name);
     }
 
+    @GetMapping("/discover/movie")
+    public List<MovieCard> discoverMovies(@RequestParam(name = "genre", defaultValue = "0") int genre,
+                                          @RequestParam(name = "sort", defaultValue = "popular") String sort,
+                                          @RequestParam(name = "page", defaultValue = "1") int page) {
+        return tmdb.discover("movie", genre, sort, page);
+    }
+
+    @GetMapping("/discover/tv")
+    public List<MovieCard> discoverSeries(@RequestParam(name = "genre", defaultValue = "0") int genre,
+                                          @RequestParam(name = "sort", defaultValue = "popular") String sort,
+                                          @RequestParam(name = "page", defaultValue = "1") int page) {
+        return tmdb.discover("tv", genre, sort, page);
+    }
+
     @GetMapping("/search")
     public List<MovieCard> search(@RequestParam("q") String q) {
         String query = q == null ? "" : q.trim();
         if (query.isEmpty() || query.length() > 100) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a movie name (up to 100 characters).");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a movie or series name (up to 100 characters).");
         }
         return tmdb.search(query);
     }
 
     @GetMapping("/movie/{id}")
     public MovieDetails movie(@PathVariable("id") int id) {
-        return tmdb.details(id);
+        return tmdb.details("movie", id);
+    }
+
+    @GetMapping("/tv/{id}")
+    public MovieDetails series(@PathVariable("id") int id) {
+        return tmdb.details("tv", id);
     }
 
     @GetMapping("/movie/{id}/matches")
-    public MatchesResponse matches(@PathVariable("id") int id) {
-        return matchService.matchesFor(id);
+    public MatchesResponse movieMatches(@PathVariable("id") int id) {
+        return matchService.matchesFor("movie", id);
+    }
+
+    @GetMapping("/tv/{id}/matches")
+    public MatchesResponse seriesMatches(@PathVariable("id") int id) {
+        return matchService.matchesFor("tv", id);
     }
 }

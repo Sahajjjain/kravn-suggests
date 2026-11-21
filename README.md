@@ -1,6 +1,6 @@
 # KravN Suggests
 
-Search a movie, see posters, cast, trailer and where to watch (TMDB), plus a
+Search a movie or series, see posters, cast, trailer and where to watch (TMDB), plus a
 "Watch if you like..." list where every pick has a match meter (0-100%).
 Save movies to "My list" with the heart button.
 

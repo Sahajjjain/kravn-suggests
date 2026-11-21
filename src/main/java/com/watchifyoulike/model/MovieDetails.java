@@ -2,7 +2,7 @@ package com.watchifyoulike.model;
 
 import java.util.List;
 
-/** Everything the movie page needs. */
+/** Everything the movie / series page needs. mediaType is "movie" or "tv". */
 public record MovieDetails(
         int id,
         String title,
@@ -20,5 +20,10 @@ public record MovieDetails(
         String trailerKey,
         List<Provider> providers,
         String providerLink,
-        String region) {
+        String region,
+        String mediaType,
+        int seasonCount,
+        int episodeCount,
+        String status,
+        List<Season> seasons) {
 }

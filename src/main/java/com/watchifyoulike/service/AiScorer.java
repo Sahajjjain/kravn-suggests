@@ -73,7 +73,7 @@ public class AiScorer {
         return true;
     }
 
-    public Map<Integer, Score> score(String title, String year, String overview,
+    public Map<Integer, Score> score(String kind, String title, String year, String overview,
                                      List<String> genres, List<MovieCard> candidates) {
         if (!isConfigured() || candidates.isEmpty() || !allowCall()) {
             return Map.of();
@@ -94,23 +94,23 @@ public class AiScorer {
             }
 
             String prompt = """
-                    A viewer loves the movie "%s" (%s).
+                    A viewer loves the %s "%s" (%s).
                     Genres: %s
                     Plot: %s
 
-                    Here are candidate movies to recommend, as JSON:
+                    Here are candidate titles to recommend, as JSON:
                     %s
 
                     For EVERY candidate give a "similarity" from 0 to 100: how close it is to the
-                    loved movie in themes, tone, pacing, storytelling style and emotional feel.
+                    loved title in themes, tone, pacing, storytelling style and emotional feel.
                     Be honest and spread the scores out. Reserve 85 and above for movies that are
                     truly near-twins, and give loosely related picks scores in the 40s and 50s.
                     Write a "reason": one short sentence (max 18 words) on why a fan of the loved
-                    movie would enjoy it. No spoilers.
+                    title would enjoy it. No spoilers.
 
                     Reply with ONLY a JSON array, no markdown and no other text:
                     [{"id": 123, "similarity": 87, "reason": "..."}]
-                    """.formatted(title, year, String.join(", ", genres), overview,
+                    """.formatted(kind, title, year, String.join(", ", genres), overview,
                     mapper.writeValueAsString(compact));
 
             Map<String, Object> body = Map.of(

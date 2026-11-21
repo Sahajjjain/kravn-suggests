@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 import java.net.URI;
 import java.time.Duration;
@@ -54,8 +53,8 @@ public class ImageController {
             return ResponseEntity.ok()
                     .contentType(type)
                     .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic())
-                    .body(upstream.getBody());
-        } catch (RestClientException e) {
+                    .body(upstream.getBody() == null ? new byte[0] : upstream.getBody());
+        } catch (Exception e) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Image unavailable.");
         }
     }

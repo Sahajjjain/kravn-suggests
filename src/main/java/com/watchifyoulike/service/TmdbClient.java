@@ -6,6 +6,7 @@ import com.watchifyoulike.model.CastMember;
 import com.watchifyoulike.model.MovieCard;
 import com.watchifyoulike.model.MovieDetails;
 import com.watchifyoulike.model.Provider;
+import com.watchifyoulike.model.Season;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,7 +54,7 @@ public class TmdbClient {
 
     public TmdbClient(@Value("${tmdb.token:}") String token,
                       @Value("${tmdb.region:IN}") String region) {
-        this.token = token.trim();
+        this.token = token.trim().replace("\"", "").replace("'", "").replaceFirst("(?i)^bearer\\s+", "").trim();
         // The long "API Read Access Token" starts with eyJ and goes in a header.
         // The short 32-character "API Key" goes in the URL instead. We support both.
         this.useBearer = this.token.startsWith("eyJ");
@@ -68,32 +69,64 @@ public class TmdbClient {
     // ---------------- public API ----------------
 
     public List<MovieCard> trending() {
-        return cards(get("/trending/movie/week"));
+        return cards(get("/trending/movie/week"), "movie");
     }
 
     /** Home page rows. Only these names are allowed. */
     public List<MovieCard> list(String name) {
         return switch (name) {
-            case "trending" -> cards(get("/trending/movie/week"));
-            case "now_playing" -> cards(get("/movie/now_playing", "region", region));
-            case "top_rated" -> cards(get("/movie/top_rated"));
+            case "trending" -> cards(get("/trending/movie/week"), "movie");
+            case "now_playing" -> cards(get("/movie/now_playing", "region", region), "movie");
+            case "top_rated" -> cards(get("/movie/top_rated"), "movie");
+            case "popular" -> cards(get("/movie/popular"), "movie");
+            case "upcoming" -> cards(get("/movie/upcoming", "region", region), "movie");
+            case "trending_tv" -> cards(get("/trending/tv/week"), "tv");
+            case "on_the_air" -> cards(get("/tv/on_the_air"), "tv");
+            case "top_rated_tv" -> cards(get("/tv/top_rated"), "tv");
+            case "popular_tv" -> cards(get("/tv/popular"), "tv");
             default -> throw new ApiException(HttpStatus.NOT_FOUND, "Unknown list.");
         };
     }
 
+    /** Searches movies and series together. People and other result types are dropped. */
     public List<MovieCard> search(String query) {
-        return cards(get("/search/movie", "query", query, "include_adult", "false"));
+        return cards(get("/search/multi", "query", query, "include_adult", "false"), null);
     }
 
-    /** One call that returns the movie plus its cast, videos and streaming info. */
-    public JsonNode movieRaw(int id) {
-        return get("/movie/" + id,
+    /** Browse by genre. sort is "popular" or "rating"; genre 0 means any genre. Pages 1 to 10. */
+    public List<MovieCard> discover(String type, int genre, String sort, int page) {
+        checkType(type);
+        boolean byRating = "rating".equals(sort);
+        List<String> params = new ArrayList<>(List.of(
+                "include_adult", "false",
+                "sort_by", byRating ? "vote_average.desc" : "popularity.desc",
+                "vote_count.gte", byRating ? "500" : "50",
+                "page", String.valueOf(Math.max(1, Math.min(page, 10)))));
+        if (genre > 0) {
+            params.add("with_genres");
+            params.add(String.valueOf(genre));
+        }
+        return cards(get("/discover/" + type, params.toArray(new String[0])), type);
+    }
+
+    private static String checkType(String type) {
+        if (!"movie".equals(type) && !"tv".equals(type)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "That page was not found.");
+        }
+        return type;
+    }
+
+    /** One call that returns the movie or series plus its cast, videos and streaming info. */
+    public JsonNode titleRaw(String type, int id) {
+        return get("/" + checkType(type) + "/" + id,
                 "append_to_response", "credits,videos,watch/providers",
                 "include_video_language", "en,hi,null");
     }
 
-    public MovieDetails details(int id) {
-        JsonNode m = movieRaw(id);
+    public MovieDetails details(String type, int id) {
+        checkType(type);
+        boolean tv = "tv".equals(type);
+        JsonNode m = titleRaw(type, id);
 
         List<CastMember> cast = new ArrayList<>();
         for (JsonNode c : m.path("credits").path("cast")) {
@@ -106,19 +139,53 @@ public class TmdbClient {
                     image("w185", c.path("profile_path"))));
         }
 
+        // Movies show the director, series show the creators.
         List<String> directors = new ArrayList<>();
-        for (JsonNode c : m.path("credits").path("crew")) {
-            if ("Director".equals(c.path("job").asText())) {
-                directors.add(c.path("name").asText(""));
+        if (tv) {
+            for (JsonNode c : m.path("created_by")) {
+                String name = c.path("name").asText("");
+                if (!name.isEmpty()) {
+                    directors.add(name);
+                }
             }
+        } else {
+            for (JsonNode c : m.path("credits").path("crew")) {
+                if ("Director".equals(c.path("job").asText())) {
+                    directors.add(c.path("name").asText(""));
+                }
+            }
+        }
+
+        List<Season> seasons = new ArrayList<>();
+        if (tv) {
+            for (JsonNode s : m.path("seasons")) {
+                if (s.path("season_number").asInt(0) == 0) {
+                    continue; // "Specials" are not a real season
+                }
+                seasons.add(new Season(
+                        s.path("name").asText("Season " + s.path("season_number").asInt()),
+                        s.path("episode_count").asInt(0),
+                        year(s.path("air_date").asText("")),
+                        image("w342", s.path("poster_path"))));
+            }
+        }
+
+        int runtime = 0;
+        if (tv) {
+            JsonNode runs = m.path("episode_run_time");
+            if (runs.isArray() && runs.size() > 0) {
+                runtime = runs.get(0).asInt(0);
+            }
+        } else {
+            runtime = m.path("runtime").asInt(0);
         }
 
         return new MovieDetails(
                 m.path("id").asInt(),
-                m.path("title").asText(""),
+                m.path(tv ? "name" : "title").asText(""),
                 m.path("tagline").asText(""),
-                year(m.path("release_date").asText("")),
-                m.path("runtime").asInt(0),
+                year(m.path(tv ? "first_air_date" : "release_date").asText("")),
+                runtime,
                 round1(m.path("vote_average").asDouble(0)),
                 m.path("vote_count").asInt(0),
                 m.path("overview").asText(""),
@@ -130,14 +197,20 @@ public class TmdbClient {
                 trailerKey(m),
                 providers(m),
                 m.path("watch/providers").path("results").path(region).path("link").asText(""),
-                region);
+                region,
+                type,
+                m.path("number_of_seasons").asInt(0),
+                m.path("number_of_episodes").asInt(0),
+                m.path("status").asText(""),
+                seasons);
     }
 
     /** Candidates = TMDB's "recommendations" first, then "similar" to fill up. Posters only. */
-    public List<MovieCard> candidates(int id, int limit) {
+    public List<MovieCard> candidates(String type, int id, int limit) {
+        checkType(type);
         Map<Integer, MovieCard> found = new LinkedHashMap<>();
         for (String kind : new String[]{"recommendations", "similar"}) {
-            JsonNode results = get("/movie/" + id + "/" + kind).path("results");
+            JsonNode results = get("/" + type + "/" + id + "/" + kind).path("results");
             for (JsonNode n : results) {
                 int candidateId = n.path("id").asInt();
                 if (candidateId == id || found.containsKey(candidateId)) {
@@ -146,7 +219,7 @@ public class TmdbClient {
                 if (!n.path("poster_path").isTextual() || n.path("adult").asBoolean(false)) {
                     continue;
                 }
-                found.put(candidateId, card(n));
+                found.put(candidateId, card(n, type));
                 if (found.size() >= limit) {
                     return new ArrayList<>(found.values());
                 }
@@ -172,33 +245,43 @@ public class TmdbClient {
         return names;
     }
 
-    private List<MovieCard> cards(JsonNode root) {
+    /**
+     * Turns a TMDB result list into cards. forcedType is "movie" or "tv" for lists of one kind;
+     * pass null for mixed lists (search), where each result says its own media_type.
+     */
+    private List<MovieCard> cards(JsonNode root, String forcedType) {
         List<MovieCard> list = new ArrayList<>();
         for (JsonNode n : root.path("results")) {
             if (list.size() >= 20) {
                 break;
             }
-            if (!n.path("title").asText("").isEmpty()) {
-                list.add(card(n));
+            String type = forcedType != null ? forcedType : n.path("media_type").asText("");
+            if (!"movie".equals(type) && !"tv".equals(type)) {
+                continue; // people and anything else
+            }
+            if (!n.path("title").asText(n.path("name").asText("")).isEmpty()) {
+                list.add(card(n, type));
             }
         }
         return list;
     }
 
-    private MovieCard card(JsonNode n) {
+    private MovieCard card(JsonNode n, String type) {
+        boolean tv = "tv".equals(type);
         List<Integer> genreIds = new ArrayList<>();
         for (JsonNode g : n.path("genre_ids")) {
             genreIds.add(g.asInt());
         }
         return new MovieCard(
                 n.path("id").asInt(),
-                n.path("title").asText(""),
-                year(n.path("release_date").asText("")),
+                n.path(tv ? "name" : "title").asText(""),
+                year(n.path(tv ? "first_air_date" : "release_date").asText("")),
                 image("w342", n.path("poster_path")),
                 round1(n.path("vote_average").asDouble(0)),
                 n.path("overview").asText(""),
                 Genres.names(genreIds),
-                image("w780", n.path("backdrop_path")));
+                image("w780", n.path("backdrop_path")),
+                type);
     }
 
     private String trailerKey(JsonNode m) {
@@ -284,6 +367,9 @@ public class TmdbClient {
                         })
                         .retrieve()
                         .body(JsonNode.class);
+                if (body == null) {
+                    throw new RestClientException("Empty response from TMDB");
+                }
                 if (cache.size() > 500) {
                     cache.clear();
                 }
@@ -296,7 +382,7 @@ public class TmdbClient {
                             "TMDB rejected the token. Use the 'API Read Access Token' from your TMDB account settings.");
                 }
                 if (code == 404) {
-                    throw new ApiException(HttpStatus.NOT_FOUND, "That movie was not found.");
+                    throw new ApiException(HttpStatus.NOT_FOUND, "That title was not found.");
                 }
                 throw new ApiException(HttpStatus.BAD_GATEWAY, "TMDB returned an error (" + code + "). Try again.");
             } catch (RestClientException e) {

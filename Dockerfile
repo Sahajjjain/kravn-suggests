@@ -10,6 +10,6 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 # Free hosts have about 512 MB of memory, so keep Java small.
-ENV JAVA_TOOL_OPTIONS="-Xmx320m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+ENV JAVA_TOOL_OPTIONS="-Xmx256m -Xss512k -XX:MaxMetaspaceSize=96m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
 EXPOSE 8080
 CMD ["java", "-jar", "app.jar"]

@@ -27,27 +27,29 @@ public class MatchService {
 
     private final TmdbClient tmdb;
     private final AiScorer ai;
-    private final Map<Integer, MatchesResponse> cache = new ConcurrentHashMap<>();
+    private final Map<String, MatchesResponse> cache = new ConcurrentHashMap<>();
 
     public MatchService(TmdbClient tmdb, AiScorer ai) {
         this.tmdb = tmdb;
         this.ai = ai;
     }
 
-    public MatchesResponse matchesFor(int id) {
-        MatchesResponse cached = cache.get(id);
+    public MatchesResponse matchesFor(String type, int id) {
+        String cacheKey = type + ":" + id;
+        MatchesResponse cached = cache.get(cacheKey);
         if (cached != null) {
             return cached;
         }
 
-        JsonNode base = tmdb.movieRaw(id);
-        String title = base.path("title").asText("this movie");
-        String year = TmdbClient.year(base.path("release_date").asText(""));
+        JsonNode base = tmdb.titleRaw(type, id);
+        boolean tv = "tv".equals(type);
+        String title = base.path(tv ? "name" : "title").asText("this title");
+        String year = TmdbClient.year(base.path(tv ? "first_air_date" : "release_date").asText(""));
         String overview = base.path("overview").asText("");
         List<String> baseGenres = tmdb.genreNames(base.path("genres"));
-        List<MovieCard> candidates = tmdb.candidates(id, MAX_CANDIDATES);
+        List<MovieCard> candidates = tmdb.candidates(type, id, MAX_CANDIDATES);
 
-        Map<Integer, AiScorer.Score> scores = ai.score(title, year, overview, baseGenres, candidates);
+        Map<Integer, AiScorer.Score> scores = ai.score(tv ? "TV series" : "movie", title, year, overview, baseGenres, candidates);
 
         List<Match> matches = new ArrayList<>();
         for (int i = 0; i < candidates.size(); i++) {
@@ -71,7 +73,7 @@ public class MatchService {
             if (cache.size() > 300) {
                 cache.clear();
             }
-            cache.put(id, response);
+            cache.put(cacheKey, response);
         }
         return response;
     }
